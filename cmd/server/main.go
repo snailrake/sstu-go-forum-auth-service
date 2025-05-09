@@ -1,55 +1,64 @@
-// cmd/server/main.go
 package main
 
 import (
 	"database/sql"
-	"fmt"
-	"github.com/joho/godotenv"
-	_ "github.com/lib/pq"
 	"log"
 	"net/http"
 	"os"
+	"sstu-go-forum-auth-service/internal/repository/impl"
+
+	"github.com/joho/godotenv"
+	_ "github.com/lib/pq"
+	"github.com/rs/zerolog"
+	httpSwagger "github.com/swaggo/http-swagger"
+
+	_ "sstu-go-forum-auth-service/docs"
 	"sstu-go-forum-auth-service/internal/handler"
-	"sstu-go-forum-auth-service/internal/repository/postgres"
 	"sstu-go-forum-auth-service/internal/usecase"
 )
 
+var logger zerolog.Logger
+
+func init() {
+	logger = zerolog.New(os.Stdout).With().Timestamp().Logger()
+}
+
+// @title API сервиса авторизации
+// @version 1.0
+// @host localhost:8081
+// @BasePath /
+// @schemes http
 func main() {
 	if err := godotenv.Load(); err != nil {
-		log.Fatal("ошибка загрузки .env")
+		logger.Fatal().Err(err).Msg("failed to load .env")
 	}
 
-	// Подключаемся к базе данных
-	dbURL := os.Getenv("DATABASE_URL")
-	db, err := sql.Open("postgres", dbURL)
+	db, err := sql.Open("postgres", os.Getenv("DATABASE_URL"))
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal().Err(err).Msg("failed to open database connection")
 	}
 	defer db.Close()
 
 	if err := db.Ping(); err != nil {
-		log.Fatal(err)
+		logger.Fatal().Err(err).Msg("failed to ping database")
 	}
-	fmt.Println("Connected to database")
 
-	// Инициализация репозиториев и use case
-	authRepo := postgres.NewRepository(db)
-	authUC := usecase.NewAuthUseCase(authRepo)
+	authUC := usecase.NewAuthUseCase(impl.NewRepository(db))
 	authHandler := handler.NewAuthHandler(authUC)
 
-	// Настройка маршрутов
 	mux := http.NewServeMux()
 	mux.HandleFunc("/register", authHandler.Register)
 	mux.HandleFunc("/login", authHandler.Login)
 	mux.HandleFunc("/refresh", authHandler.Refresh)
+	mux.HandleFunc("/swagger/", httpSwagger.WrapHandler)
 
-	// Запуск сервера
-	fmt.Println("Server is running on :8080")
+	logger.Info().Msg("Starting server on :8081")
 	log.Fatal(http.ListenAndServe(":8081", withCORS(mux)))
 }
 
 func withCORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		logger.Debug().Str("method", r.Method).Str("url", r.URL.String()).Msg("handling request")
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type,Authorization")

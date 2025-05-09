@@ -1,30 +1,30 @@
-package postgres
+package impl
 
 import (
 	"database/sql"
-	"sstu-go-forum-auth-service/internal/domain"
-	_ "time"
+
+	"sstu-go-forum-auth-service/internal/model"
 )
 
-type Repository struct {
+type AuthRepositoryImpl struct {
 	DB *sql.DB
 }
 
-func NewRepository(db *sql.DB) *Repository {
-	return &Repository{DB: db}
+func NewRepository(db *sql.DB) *AuthRepositoryImpl {
+	return &AuthRepositoryImpl{DB: db}
 }
 
-func (r *Repository) CreateUser(user *domain.User) error {
+func (r *AuthRepositoryImpl) CreateUser(user *model.User) error {
 	return r.DB.QueryRow(
 		"INSERT INTO users (username, password, role) VALUES ($1, $2, $3) RETURNING id",
 		user.Username, user.Password, user.Role,
 	).Scan(&user.ID)
 }
 
-func (r *Repository) GetUserByUsername(username string) (*domain.User, error) {
-	user := &domain.User{}
+func (r *AuthRepositoryImpl) GetUserByUsername(username string) (*model.User, error) {
+	user := &model.User{}
 	err := r.DB.QueryRow(
-		"SELECT id, username, password, role FROM users WHERE username=$1",
+		"SELECT id, username, password, role FROM users WHERE username = $1",
 		username,
 	).Scan(&user.ID, &user.Username, &user.Password, &user.Role)
 	if err != nil {
@@ -33,20 +33,20 @@ func (r *Repository) GetUserByUsername(username string) (*domain.User, error) {
 	return user, nil
 }
 
-func (r *Repository) DeleteRefreshTokensByUserID(userID int) error {
+func (r *AuthRepositoryImpl) DeleteRefreshTokensByUserID(userID int) error {
 	_, err := r.DB.Exec("DELETE FROM refresh_tokens WHERE user_id = $1", userID)
 	return err
 }
 
-func (r *Repository) SaveRefreshToken(token *domain.RefreshToken) error {
+func (r *AuthRepositoryImpl) SaveRefreshToken(token *model.RefreshToken) error {
 	return r.DB.QueryRow(
 		"INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, $3) RETURNING id",
 		token.UserID, token.Token, token.ExpiresAt,
 	).Scan(&token.ID)
 }
 
-func (r *Repository) GetRefreshToken(tokenString string) (*domain.RefreshToken, error) {
-	rt := &domain.RefreshToken{}
+func (r *AuthRepositoryImpl) GetRefreshToken(tokenString string) (*model.RefreshToken, error) {
+	rt := &model.RefreshToken{}
 	err := r.DB.QueryRow(
 		"SELECT id, user_id, token, expires_at FROM refresh_tokens WHERE token = $1",
 		tokenString,
@@ -57,7 +57,7 @@ func (r *Repository) GetRefreshToken(tokenString string) (*domain.RefreshToken, 
 	return rt, nil
 }
 
-func (r *Repository) DeleteRefreshToken(tokenString string) error {
+func (r *AuthRepositoryImpl) DeleteRefreshToken(tokenString string) error {
 	_, err := r.DB.Exec("DELETE FROM refresh_tokens WHERE token = $1", tokenString)
 	return err
 }

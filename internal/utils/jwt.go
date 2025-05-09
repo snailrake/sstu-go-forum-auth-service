@@ -17,12 +17,7 @@ func GenerateAccessToken(userID int, username, role string) (string, error) {
 		"exp":      exp.Unix(),
 		"iat":      time.Now().Unix(),
 	}
-	secret := os.Getenv("JWT_SECRET")
-	if secret == "" {
-		secret = "secretkey"
-	}
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString([]byte(secret))
+	return signToken(claims)
 }
 
 func GenerateRefreshToken(userID int, username, role string) (string, time.Time, error) {
@@ -34,20 +29,12 @@ func GenerateRefreshToken(userID int, username, role string) (string, time.Time,
 		"exp":      exp.Unix(),
 		"iat":      time.Now().Unix(),
 	}
-	secret := os.Getenv("JWT_SECRET")
-	if secret == "" {
-		secret = "secretkey"
-	}
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	signed, err := token.SignedString([]byte(secret))
-	return signed, exp, err
+	token, err := signToken(claims)
+	return token, exp, err
 }
 
 func VerifyToken(tokenString string) (jwt.MapClaims, error) {
-	secret := os.Getenv("JWT_SECRET")
-	if secret == "" {
-		secret = "secretkey"
-	}
+	secret := getSecret()
 	token, err := jwt.Parse(tokenString, func(t *jwt.Token) (interface{}, error) {
 		return []byte(secret), nil
 	})
@@ -59,4 +46,16 @@ func VerifyToken(tokenString string) (jwt.MapClaims, error) {
 		return nil, errors.New("invalid token claims")
 	}
 	return claims, nil
+}
+
+func signToken(claims jwt.MapClaims) (string, error) {
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString([]byte(getSecret()))
+}
+
+func getSecret() string {
+	if s := os.Getenv("JWT_SECRET"); s != "" {
+		return s
+	}
+	return "secretkey"
 }
