@@ -14,7 +14,7 @@ import (
 
 	_ "sstu-go-forum-auth-service/docs"
 	"sstu-go-forum-auth-service/internal/handler"
-	"sstu-go-forum-auth-service/internal/usecase"
+	usecaseImpl "sstu-go-forum-auth-service/internal/usecase/impl"
 )
 
 var logger zerolog.Logger
@@ -43,7 +43,8 @@ func main() {
 		logger.Fatal().Err(err).Msg("failed to ping database")
 	}
 
-	authUC := usecase.NewAuthUseCase(impl.NewRepository(db))
+	repo := impl.NewRepository(db)
+	authUC := usecaseImpl.NewAuthUseCase(repo)
 	authHandler := handler.NewAuthHandler(authUC)
 
 	mux := http.NewServeMux()

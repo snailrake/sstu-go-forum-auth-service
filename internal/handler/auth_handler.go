@@ -2,17 +2,19 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
+	"sstu-go-forum-auth-service/internal/dto"
 
 	"sstu-go-forum-auth-service/internal/model"
 	"sstu-go-forum-auth-service/internal/usecase"
 )
 
 type AuthHandler struct {
-	UseCase *usecase.AuthUseCase
+	UseCase usecase.AuthUseCase
 }
 
-func NewAuthHandler(uc *usecase.AuthUseCase) *AuthHandler {
+func NewAuthHandler(uc usecase.AuthUseCase) *AuthHandler { // TODO: принимать аргумент-интерфейс
 	return &AuthHandler{UseCase: uc}
 }
 
@@ -29,6 +31,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "use POST", http.StatusMethodNotAllowed)
 		return
 	}
+
 	var u model.User
 	if err := json.NewDecoder(r.Body).Decode(&u); err != nil {
 		http.Error(w, "invalid request", http.StatusBadRequest)
@@ -36,10 +39,20 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 
-	resp, err := h.UseCase.Register(&u)
+	createdUser, err := h.UseCase.Register(&u)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		switch {
+		case errors.Is(err, usecase.ErrUserAlreadyExists):
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		default:
+			http.Error(w, "internal error", http.StatusInternalServerError)
+		}
 		return
+	}
+
+	resp := dto.RegisterResponse{
+		Message: "Пользователь зарегистрирован",
+		UserID:  createdUser.ID,
 	}
 	json.NewEncoder(w).Encode(resp)
 }
@@ -57,17 +70,28 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "use POST", http.StatusMethodNotAllowed)
 		return
 	}
-	var req model.LoginRequest
+
+	var req dto.LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid request", http.StatusBadRequest)
 		return
 	}
 	defer r.Body.Close()
 
-	resp, err := h.UseCase.Login(req)
+	_, access, refresh, err := h.UseCase.Login(req)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusUnauthorized)
+		switch {
+		case errors.Is(err, usecase.ErrInvalidCredentials):
+			http.Error(w, err.Error(), http.StatusUnauthorized)
+		default:
+			http.Error(w, "internal error", http.StatusInternalServerError)
+		}
 		return
+	}
+
+	resp := dto.AuthResponse{
+		AccessToken:  access,
+		RefreshToken: refresh,
 	}
 	json.NewEncoder(w).Encode(resp)
 }
@@ -85,17 +109,29 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "use POST", http.StatusMethodNotAllowed)
 		return
 	}
-	var req model.RefreshRequest
+
+	var req dto.RefreshRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid request", http.StatusBadRequest)
 		return
 	}
 	defer r.Body.Close()
 
-	resp, err := h.UseCase.RefreshToken(req)
+	_, access, refresh, err := h.UseCase.RefreshToken(req)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusUnauthorized)
+		switch {
+		case errors.Is(err, usecase.ErrInvalidTokenData),
+			errors.Is(err, usecase.ErrInvalidRefreshToken):
+			http.Error(w, err.Error(), http.StatusUnauthorized)
+		default:
+			http.Error(w, "internal error", http.StatusInternalServerError)
+		}
 		return
+	}
+
+	resp := dto.AuthResponse{
+		AccessToken:  access,
+		RefreshToken: refresh,
 	}
 	json.NewEncoder(w).Encode(resp)
 }

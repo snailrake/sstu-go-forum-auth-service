@@ -1,4 +1,4 @@
-package model
+package dto
 
 // RegisterResponse представляет ответ на запрос регистрации
 // @Description Структура ответа при успешной регистрации пользователя

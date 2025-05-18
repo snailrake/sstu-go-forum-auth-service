@@ -1,4 +1,4 @@
-package model
+package dto
 
 // RefreshRequest представляет запрос на обновление токена
 // @Description Структура запроса для обновления токена с новым refresh токеном

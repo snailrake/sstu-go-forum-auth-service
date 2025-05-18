@@ -1,4 +1,4 @@
-package model
+package dto
 
 // AuthResponse представляет ответ на запрос авторизации с токенами
 // @Description Структура ответа для авторизации, содержащая access и refresh токены
